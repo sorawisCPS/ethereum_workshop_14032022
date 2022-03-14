@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="../web3.min.js"></script>
+  <script type="text/javascript">
+    // Coding 1 : Set Contract Address
+    var contractAddress = "0x319685b27E233C14B1DF6D7551DEfBc4cDeBB93B";
+    var network = "";
+    var contract = "";
+    var userAccount = "";
+    // Coding 2 : Set ABI
+    let abi = [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint8",
+						"name": "number",
+						"type": "uint8"
+					},
+					{
+						"indexed": false,
+						"internalType": "bool",
+						"name": "isCorrect",
+						"type": "bool"
+					}
+				],
+				"name": "GuessReceive",
+				"type": "event"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "n",
+						"type": "uint8"
+					}
+				],
+				"name": "guess",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "prizePool",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "n",
+						"type": "uint8"
+					}
+				],
+				"name": "setNumber",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		]
+
+    window.addEventListener('load', function () {
+      if (window.ethereum) {
+        web3 = new Web3(ethereum);
+        try {
+          ethereum.enable().then(result => {
+            startApp();
+          });
+        } catch (err) {
+          console.log(err);
+        }
+      }
+    });
+
+    function startApp() {
+      web3.eth.net.getNetworkType().then(name => {
+        network = name;
+        $("#network_name").html(name);
+      });
+      web3.eth.getAccounts().then(accounts => {
+        userAccount = accounts[0];
+        web3.eth.getBalance(accounts[0]).then(balance => {
+          $("#wallet-balance").text(web3.utils.fromWei(balance, "ether"));
+        });
+        $("#wallet-address").text(userAccount);
+      });
+      updatePrizePool();
+    }
+
+    function getContract() {
+      return new web3.eth.Contract(abi, contractAddress);
+    }
+
+    function updatePrizePool() {
+      // Coding 3 : Get prize pool from contract
+      web3.eth.getBalance(contractAddress).then(balance => {
+        $("#prize-pool").text(web3.utils.fromWei(balance, "ether"));
+      })
+    }
+
+    function setLottoNumber() {
+      let contract = getContract();
+      let number = $("#lotto-number").val();
+
+      let options = {
+        from: userAccount
+      }
+
+      // Coding 4 : Call contract to set number 
+          // on Error
+          // on Transaction In Progress
+          // on Confirmation
+      contract.methods.setNumber(number).send(options)
+        .on('error', err => {
+          console.log(err)
+        }).on('transactionHash', transaction => {
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + transaction;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        }).on('confirmation', (confirmationNumber, receipt) => {
+          $('#loading-transaction').hide();
+          console.log(confirmationNumber);
+        });
+    }
+
+    function guessNumber() {
+      $("#win-prize").hide();
+      $("#lose-prize").hide();
+      let contract = getContract();
+      var number = $("#guess-number").val();
+
+      let options = {
+        from: userAccount,
+        value: 1
+      }
+
+      // Coding 5 : Call contract to guess number 
+          // on Error
+          // on Transaction In Progress
+          // on Receipt (Update prize pool and show result if win prize then show #win-prize but lose show #lose-prize)
+      contract.methods.guess(number).send(options)
+        .on('error', err => {
+          console.log(err)
+        }).on('transactionHash', transaction => {
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + transaction;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        }).on('receipt', (receipt) => {
+          $('#loading-transaction').hide();
+          console.log(receipt);
+          if (receipt.events.GuessReceive.returnValues['isCorrect']) {
+            $('#win-prize').show()
+          } else {
+            $('#lose-prize').show()
+          }
+          updatePrizePool()
+        });
+    }
+
+  </script>
+</head>
+
+<body style="padding: 5px;">
+  <div class="notification is-dark">
+    <div>Network: <span id="network_name"></span></div>
+    <div>Wallet Address: <span id="wallet-address"></span></div>
+    <div>Wallet Balance: <span id="wallet-balance"></span></div>
+    <div>
+      Last Transaction:
+      <span id="last-transaction"></span>
+      <progress style="display: none;" id="loading-transaction" class="progress is-small is-primary"
+        max="100">50%</progress>
+    </div>
+  </div>
+
+  <div class="notification is-dark">
+    <div class="columns">
+      <div class="column is-2">
+        <span>Prize Pool</span>
+      </div>
+      <div class="column is-3">
+        <span id="prize-pool"></span>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column is-2">
+        <span>Set Number</span>
+      </div>
+      <div class="column is-2">
+        <input id="lotto-number" class="input is-small" style="width:20em;" type="text" placeholder="Input number" />
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-info" style="width:5em;" onClick="javascript:setLottoNumber();">Set</button>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column is-2">
+        <span>Guess Number</span>
+      </div>
+      <div class="column is-2">
+        <input id="guess-number" class="input is-small" style="width:20em;" type="text" placeholder="Input number" />
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-warning" style="width:5em;" onClick="javascript:guessNumber();">Guess</button>
+      </div>
+      <div class="column is-1">
+        <span id="is-correct"></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: none;" id="win-prize" class="notification is-success">
+    <span>YOU WIN THE PRIZE</span>
+  </div>
+
+  <div style="display: none;" id="lose-prize" class="notification is-danger">
+    <span>MAY BE NEXT TIME</span>
+  </div>
+</body>
+
+</html>

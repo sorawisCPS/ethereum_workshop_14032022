@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="./web3.min.js"></script>
+  <script type="text/javascript">
+    // Coding 1 : Set Contract Address
+    var contractAddress = "0x6c9ddDd62F1b7E33218116aa003cdAf1704326F8";
+    var network = "";
+    var contract;
+    // Coding 2 : Set ABI
+    let abi = [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "number",
+						"type": "uint256"
+					}
+				],
+				"name": "DonateResult",
+				"type": "event"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "accounts",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "balance",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "donate",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getFund",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "totalBalance",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		]
+
+    window.addEventListener('load', function () {
+      if (window.ethereum) {
+        web3 = new Web3(ethereum);
+        try {
+          ethereum.enable().then(result => {
+            startApp();
+          });
+        } catch (err) {
+          console.log(err);
+        }
+      }
+    });
+
+    function startApp() {
+      web3.eth.net.getNetworkType().then(name => {
+        network = name;
+        $("#network_name").html(name);
+      });
+      web3.eth.getAccounts().then(accounts => {
+        userAccount = accounts[0];
+        web3.eth.getBalance(accounts[0]).then(balance => {
+          $("#wallet-balance").text(web3.utils.fromWei(balance, "ether"));
+        });
+        $("#wallet-address").text(userAccount);
+        getEvent();
+        getBalance();
+      })
+    }
+
+    function getContract() {
+      return new web3.eth.Contract(abi, contractAddress);
+    }
+
+
+    function getBalance() {
+      let contract = getContract();
+      // Coding 3 : Get Wallet Addres from wallet-address id and call balance contract function.
+      //Then show response in gwei Ether Units pattern at  balanceMoney id.
+      contract.methods.balance().call().then(balance => {
+        $("#balanceMoney").text(web3.utils.fromWei(balance, "Gwei"));
+      })
+
+    }
+    function getEvent() {
+      console.log("get event");
+      let contract = getContract();
+      // Coding 4 : Get DonateEvent Data From Contract.
+      // Then show events data in eventNumber,eventDonater,eventMoney id
+      contract.getPastEvents('DonateResult', {
+        filter: { from: userAccount },
+        fromBlock: 0,
+        toBlock: 'latest'
+      }, (error, events) => { 
+        let resultHtml = "";
+        events.forEach(item => {
+          resultHtml += "<div><span id=" + "eventNumber" + item.blockNumber + ">Event Number: "+item.blockNumber+"</span><span id=" + "eventDonater" + item.address + "> | Address: "+ item.returnValues.user +"</span><span id=" + "eventMoney" + item.returnValues.number + "> | Value: " + web3.utils.fromWei(item.returnValues.number, "Gwei") +"</span></div>"
+          document.getElementById("eventData").innerHTML = resultHtml
+        })
+      })
+    }
+    
+    function genEventData(number) {
+      for (i = 1; i <= number; i++) {
+        document.getElementById("eventData").insertAdjacentHTML("beforebegin",
+          "<div><span id=" + "eventNumber" + i + "></span><span id=" + "eventDonater" + i + "></span><span id=" + "eventMoney" + i + "></span></div>")
+      }
+
+    }
+
+    function donateMoney() {
+      let contract = getContract();
+      // Coding 5 : Get Wallet Addres from wallet-address id and input from user.
+      // Chang input to gwei gwei Ether Units pattern.Then call Donate contract function.
+      // Show response in last-transaction id.
+      let depositValue = $("#deposit-number").val()
+      let inputgwei = web3.utils.toWei(depositValue, "Gwei");
+      let options = {
+        from: userAccount,
+        value: inputgwei
+      };
+      contract.methods.donate().send(options)
+        .on('error', err => {
+          console.log(err)
+        }).on('transactionHash', transaction => {
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + transaction;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        }).on('confirmation', (confirmationNumber, receipt) => {
+          $('#loading-transaction').hide();
+          getBalance();
+          getEvent()
+        });
+    }
+
+    function getMoney() {
+      let contract = getContract();
+      // Coding 6:  Get Wallet Addres from wallet-address id and call getMoney contract function.
+      // Show response in last-transaction id.
+      let options = {
+        from: userAccount,
+      };
+      contract.methods.getFund().send(options)
+        .on('error', err => {
+          console.log(err)
+        }).on('transactionHash', transaction => {
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + transaction;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        }).on('confirmation', (confirmationNumber, receipt) => {
+          $('#loading-transaction').hide();
+          console.log(receipt);
+          getBalance();
+          getEvent()
+        });
+    }
+
+
+
+  </script>
+</head>
+
+<body style="padding: 5px;">
+  <div class="notification is-dark">
+    <div>Network: <span id="network_name"></span></div>
+    <div>Wallet Address: <span id="wallet-address"></span></div>
+    <div>Wallet Balance: <span id="wallet-balance"></span></div>
+    <div>
+      Last Transaction:
+      <a id="last-transaction"></a>
+      <progress style="display: none;" id="loading-transaction" class="progress is-small is-primary"
+        max="100">50%</progress>
+    </div>
+  </div>
+
+  <div class="notification is-dark">
+    <div class="columns">
+      <div class="column is-2">
+        <span>Balance :</span>
+      </div>
+      <div class="column is-2">
+        <h1 id="balanceMoney">0</h1>
+      </div>
+      <div class="column is-1">
+        <span>Gwei</span>
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-info" style="width:7em;" onClick="javascript:getBalance()">Get
+          Balance</button>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column is-2">
+        <span>Donate :</span>
+      </div>
+      <div class="column is-2">
+        <input id="deposit-number" class="input is-small" style="width:20em;" type="number" min="0"
+          placeholder="Input number" />
+      </div>
+      <div class="column is-1">
+        <span>Gwei</span>
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-warning" style="width:7em;"
+          onClick="javascript:donateMoney()">Donate</button>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column is-2">
+        <span>Owner Only :</span>
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-warning" style="width:7em;background-color: red;color: white;"
+          onClick="javascript:getMoney()">GetMoney</button>
+      </div>
+    </div>
+  </div>
+  <p></p>
+  <div class="notification is-dark">
+    <div class="column is-1">
+      <button class="button is-small is-info" style="width:7em;" onClick="javascript:getEvent()">Get Event</button>
+    </div>
+    <div>
+      <div id="eventData"></div>
+    </div>
+  </div>
+</body>
+
+</html>

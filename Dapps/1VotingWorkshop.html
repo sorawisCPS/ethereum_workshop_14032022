@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="web3.min.js"></script>
+  <script type="text/javascript">
+    // Coding 1 : Set Contract Address
+    var contractAddress = "0xe43ccb8ec5447aaac96D29c6d0a34F62672FCe6e";
+    var network = "";
+    var userAccount = "";
+    var contract;
+    // Coding 2 : Set ABI
+    let abi = [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"inputs": [],
+				"name": "checkLength",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "string",
+						"name": "_title",
+						"type": "string"
+					}
+				],
+				"name": "createTitle",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "owner",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "title",
+				"outputs": [
+					{
+						"internalType": "string",
+						"name": "",
+						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "string",
+						"name": "_title",
+						"type": "string"
+					}
+				],
+				"name": "vote",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "string",
+						"name": "",
+						"type": "string"
+					}
+				],
+				"name": "votes",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		]
+
+    window.addEventListener('load', function () {
+      // Coding 3 : Connect MetaMask
+      // With MetaMask
+      if (window.ethereum) {
+        web3 = new Web3(ethereum)
+        try {
+          ethereum.enable().then(result => {
+            startApp();
+          });
+        } catch (err){
+          console.log(err);
+        }
+      } else {
+        web3 = new Web3(new Web3.providers.HttpProvider("https://ropsten.infura.io/v3/be2f038f43ea4cf497e6f759bd973b67"));
+        startApp();
+      }
+      // Legacy dapp browsers
+
+      // Fallback, need to declare provider such as Infura
+    });
+
+    function startApp() {
+      // Coding 4 : Get network type and diplay on #network_name
+      web3.eth.net.getNetworkType().then(name => {
+        network = name;
+        $('#network_name').html(network);
+      });
+      // Coding 5 : Get Wallet Address and diplay on #wallet-address
+      web3.eth.getAccounts().then(account => {
+        userAccount = account[0];
+        $('#wallet-address').html(account);
+      })
+      readData();
+    }
+
+    function getContract() {
+      // Coding 6 : Get Contract from Ethereum Network
+      return new web3.eth.Contract(abi, contractAddress);
+    }
+
+    function readData() {
+      let contract = getContract();
+      
+      // Coding 7 : Call CheckLength Contract Function
+      // After call will get length amount will loop and call prepareTable, displayData with index
+      contract.methods.checkLength().call().then(resp => {
+        console.log(resp)
+        for (var i = 0; i < resp; i++) {
+          prepareTable(i);
+          displayData(i);
+        }
+      })
+    }
+
+    function prepareTable(index) {
+      let newTitle = $("#mock").clone();
+      $(newTitle).find(".mock_title").attr("id", "title_name_" + index);
+      $(newTitle).find(".mock_count").attr("id", "vote_amount_" + index);
+      $(newTitle).find(".mock_vote").attr("onClick", "javascript:vote(" + index + ");");
+      $(newTitle).appendTo("#vote_list");
+    }
+
+    function displayData(index) {
+      let contract = getContract();
+      // Coding 8 : Call title using index to get name and set to title_name_[index]
+      // After call title success then call votes[name] to get vote count then set to vote_amount_[index]
+      contract.methods.title(index).call().then(resp => {
+        $('#title_name_'+index).text(resp);
+        contract.methods.votes(resp).call().then(voteCount => {
+          $('#vote_amount_'+ index).text(voteCount);
+        })
+      })
+     
+    }
+
+    function vote(index) {
+      let contract = getContract();
+
+      // Coding 8 : Call Vote Contract Function
+          // on Error
+          // on Transaction In Progress
+          // on Confirmation
+      
+      contract.methods.title(index).call().then(name => {
+        contract.methods.vote(name).send({
+          from: userAccount
+        }).on('error', function(error) {
+          console.log(error);
+        }).on('transactionHash', function(hash) {
+          console.log(hash);
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + hash;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        })
+        .on('confirmation', function(confirmationNumber, receipt) {
+          $('#loading-transaction').hide();
+          console.log(confirmationNumber);
+        });
+      });
+    }
+
+  </script>
+</head>
+
+<body style="padding: 5px;">
+  <div class="block notification is-dark">
+    <div>Network: <span id="network_name"></span></div>
+    <div>Wallet Address: <span id="wallet-address"></span></div>
+    <div>
+      Last Transaction:
+      <span id="last-transaction"></span>
+      <progress style="display: none;" id="loading-transaction" class="progress is-small is-primary"
+        max="100">50%</progress>
+    </div>
+  </div>
+  <div id="vote_list">
+    <div class="columns notification is-info">
+      <div class="column">Name</div>
+      <div class="column">Count</div>
+      <div class="column">Vote</div>
+    </div>
+  </div>
+
+  <div style="display: none;">
+    <div id="mock">
+      <div class="columns">
+        <div class="column mock_title"></div>
+        <div class="column mock_count"></div>
+        <div class="column"><button class="button mock_vote is-info" onClick="">Vote</button></div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

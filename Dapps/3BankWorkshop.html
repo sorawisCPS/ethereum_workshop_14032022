@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="../web3.min.js"></script>
+  <script type="text/javascript">
+    // Coding 1 : Set Contract Address
+    var contractAddress = "0x9e8F6ba0cbf6c5B4194B994Fc648Bbd8BA4DCfBB";
+    var network = "";
+    var contract = "";
+    var userAccount = "";
+    // Coding 2 : Set ABI
+    let abi = [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"inputs": [],
+				"name": "balance",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "deposit",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "money",
+						"type": "uint256"
+					}
+				],
+				"name": "withdraw",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		]
+
+    window.addEventListener('load', function () {
+      if (window.ethereum) {
+        web3 = new Web3(ethereum);
+        try {
+          ethereum.enable().then(result => {
+            startApp();
+          });
+        } catch (err) {
+          console.log(err);
+        }
+      }
+    });
+
+    function startApp() {
+      web3.eth.net.getNetworkType().then(name => {
+        network = name;
+        $("#network_name").html(name);
+      });
+      web3.eth.getAccounts().then(accounts => {
+        userAccount = accounts[0];
+        web3.eth.getBalance(accounts[0]).then(balance => {
+          $("#wallet-balance").text(web3.utils.fromWei(balance, "ether"));
+        });
+        $("#wallet-address").text(userAccount);
+        getBankBalance();
+      })
+
+    }
+
+    function getContract() {
+      return new web3.eth.Contract(abi, contractAddress);
+    }
+
+
+    function getBankBalance() {
+      let contract = getContract();
+      let options = {
+        from: userAccount
+      };
+      // Coding 3 : Call balance function from contract then convert to gwei and show at #balanceMoney
+      contract.methods.balance().call().then(balance => {
+        $("#balanceMoney").text(web3.utils.fromWei(balance, "Gwei"));
+      })
+    }
+
+    function deposit() {
+      let contract = getContract();
+      let depositValue = $("#deposit-number").val()
+      let inputgwei = web3.utils.toWei(depositValue, "Gwei");
+      let options = {
+        from: userAccount,
+        value: inputgwei
+      };
+      
+      // Coding 3 : Call deposit function from contract
+      contract.methods.deposit().send(options)
+        .on('error', err => {
+          console.log(err)
+        }).on('transactionHash', transaction => {
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + transaction;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        }).on('confirmation', (confirmationNumber, receipt) => {
+          $('#loading-transaction').hide();
+          console.log(receipt);
+          getBankBalance();
+        });
+
+    }
+
+    function withdraw() {
+      let contract = getContract();
+      let withdrawValue = $("#withdraw-number").val();
+      let inputgwei = web3.utils.toWei(withdrawValue, "Gwei");
+
+      let options = {
+        from: userAccount,
+      };
+      // Coding 3 : Call withdraw function from contract
+      contract.methods.withdraw(inputgwei).send(options)
+        .on('error', err => {
+          console.log(err)
+        }).on('transactionHash', transaction => {
+          let link = "https://" + network.toLowerCase() + ".etherscan.io/tx/" + transaction;
+          $('#last-transaction').attr("href", link);
+          $('#last-transaction').text(link);
+          $('#loading-transaction').show();
+        }).on('confirmation', (confirmationNumber, receipt) => {
+          $('#loading-transaction').hide();
+          console.log(receipt);
+          getBankBalance();
+        });
+        
+      getBankBalance();
+    }
+
+
+
+  </script>
+</head>
+
+<body style="padding: 5px;">
+  <div class="notification is-dark">
+    <div>Network: <span id="network_name"></span></div>
+    <div>Wallet Address: <span id="wallet-address"></span></div>
+    <div>Wallet Balance: <span id="wallet-balance"></span></div>
+    <div>
+      Last Transaction:
+      <a id="last-transaction"></a>
+      <progress style="display: none;" id="loading-transaction" class="progress is-small is-primary"
+        max="100">50%</progress>
+    </div>
+  </div>
+
+  <div class="notification is-dark">
+    <div class="columns">
+      <div class="column is-2">
+        <span>Balance :</span>
+      </div>
+      <div class="column is-2">
+        <h1 id="balanceMoney">0</h1>
+      </div>
+      <div class="column is-1">
+        <span>Gwei</span>
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-info" style="width:7em;" onClick="javascript:getBankBalance();">Get
+          Balance</button>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column is-2">
+        <span>Deposit</span>
+      </div>
+      <div class="column is-2">
+        <input id="deposit-number" class="input is-small" style="width:20em;" type="number" min="0"
+          placeholder="Input number" />
+      </div>
+      <div class="column is-1">
+        <span>Gwei</span>
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-warning" style="width:7em;" onClick="javascript:deposit();">Deposit</button>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column is-2">
+        <span>WithDraw</span>
+      </div>
+      <div class="column is-2">
+        <input id="withdraw-number" class="input is-small" style="width:20em;" type="number" min="0"
+          placeholder="Input number" />
+      </div>
+      <div class="column is-1">
+        <span>Gwei</span>
+      </div>
+      <div class="column is-1">
+        <button class="button is-small is-warning" style="width:7em;" onClick="javascript:withdraw();">Withdraw</button>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
